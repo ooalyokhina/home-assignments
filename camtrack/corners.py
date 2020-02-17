@@ -36,16 +36,35 @@ class _CornerStorageBuilder:
 
 def _build_impl(frame_sequence: pims.FramesSequence,
                 builder: _CornerStorageBuilder) -> None:
-    image_0 = frame_sequence[0]
-    corners = FrameCorners(
-        np.array([0]),
-        np.array([[0, 0]]),
-        np.array([55])
-    )
-    builder.set_corners_at_frame(0, corners)
-    for frame, image_1 in enumerate(frame_sequence[1:], 1):
-        builder.set_corners_at_frame(frame, corners)
-        image_0 = image_1
+    dist = 13
+    params = dict(maxCorners=400,
+                  qualityLevel=0.01,
+                  minDistance=dist,
+                  useHarrisDetector=False,
+                  blockSize=dist)
+    prev = (frame_sequence[0] * 255).astype(np.uint8)
+    pts = cv2.goodFeaturesToTrack(image=prev, **params)
+    ids = np.arange(len(pts))
+    builder.set_corners_at_frame(0, FrameCorners(ids, pts, np.full(len(pts), dist)))
+    for frame, cur in enumerate(frame_sequence[1:]):
+        cur = (cur * 255).astype(np.uint8)
+        pts, status, err = cv2.calcOpticalFlowPyrLK(prev, cur, pts, None, winSize=(dist, dist))
+        pts = pts[status.reshape(-1).astype(np.bool)]
+        ids = ids[status.reshape(-1).astype(np.bool)]
+        if len(pts) < 400:
+            mask = get_mask(cur, pts, dist)
+            params['maxCorners'] = 400 - len(pts)
+            pts = np.append(pts, cv2.goodFeaturesToTrack(cur, mask=mask, **params)).reshape((-1, 1, 2))
+            ids = np.arange(len(pts))
+        builder.set_corners_at_frame(frame, FrameCorners(ids, pts, np.full(len(pts), dist)))
+        prev = cur
+
+
+def get_mask(cur, pts, dist):
+    mask = np.full_like(cur, 255)
+    for x, y in pts.reshape(-1, 2):
+        cv2.circle(mask, (x, y), dist, 0, -1)
+    return mask
 
 
 def build(frame_sequence: pims.FramesSequence,
