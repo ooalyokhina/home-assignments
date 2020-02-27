@@ -45,6 +45,7 @@ def _build_impl(frame_sequence: pims.FramesSequence,
     prev = (frame_sequence[0] * 255).astype(np.uint8)
     pts = cv2.goodFeaturesToTrack(image=prev, **params)
     ids = np.arange(len(pts))
+    max_id = len(ids)
     builder.set_corners_at_frame(0, FrameCorners(ids, pts, np.full(len(pts), dist)))
     for frame, cur in enumerate(frame_sequence[1:]):
         cur = (cur * 255).astype(np.uint8)
@@ -55,6 +56,8 @@ def _build_impl(frame_sequence: pims.FramesSequence,
             mask = get_mask(cur, pts, dist)
             params['maxCorners'] = 400 - len(pts)
             pts = np.append(pts, cv2.goodFeaturesToTrack(cur, mask=mask, **params)).reshape((-1, 1, 2))
+            ids = np.append(ids, np.arange(max_id, max_id + len(pts)))
+            max_id = ids[len(ids) - 1] + 1
             ids = np.arange(len(pts))
         builder.set_corners_at_frame(frame, FrameCorners(ids, pts, np.full(len(pts), dist)))
         prev = cur
