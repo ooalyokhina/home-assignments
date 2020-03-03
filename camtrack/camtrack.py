@@ -96,13 +96,17 @@ def track_and_find_point_cloud(intrinsic_mat, corner_storage, known_view_1, know
             points_3d = np.array(points_3d)
             points_2d = np.array(points_2d)
 
-            retval, rvec, tvec, inliers = cv2.solvePnPRansac(points_3d.reshape((-1, 1, 3)),
-                                                             points_2d.reshape((-1, 1, 2)),
-                                                             cameraMatrix=intrinsic_mat,
-                                                             distCoeffs=None,
-                                                             reprojectionError=PNP_REPROJ_ERROR)
+            try:
+                retval, rvec, tvec, inliers = cv2.solvePnPRansac(points_3d.reshape((-1, 1, 3)),
+                                                                 points_2d.reshape((-1, 1, 2)),
+                                                                 cameraMatrix=intrinsic_mat,
+                                                                 distCoeffs=None,
+                                                                 reprojectionError=PNP_REPROJ_ERROR)
+                if not retval:
+                    print("Unsuccessful solution of PnP")
+                    continue
 
-            if not retval:
+            except Exception:
                 print("Unsuccessful solution of PnP")
                 continue
 
