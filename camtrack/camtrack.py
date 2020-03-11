@@ -53,6 +53,7 @@ def track_and_calc_colors(camera_parameters: CameraParameters,
         print(f' {len(new_ids)} new points')
     flag = True
     while flag:
+        flag = False
         for i in range(len(track)):
             if track[i] is None:
                 flag = tracker(i, track, points, corners, prms, intrinsic_mat)
