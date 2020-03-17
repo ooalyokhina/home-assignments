@@ -114,7 +114,7 @@ def get_views(corners: CornerStorage,
         if cloud_size > max_size:
             max_size, pose_for_max_size, index_for_max_size = cloud_size, pose, i
         print(f'cloud size = {cloud_size}, frames={init_ind}, {i}')
-    return (0, view_mat3x4_to_pose(eye3x4())), (pose_for_max_size, index_for_max_size)
+    return (0, view_mat3x4_to_pose(eye3x4())), (index_for_max_size, pose_for_max_size,)
 
 
 def tracker(tid: int,
