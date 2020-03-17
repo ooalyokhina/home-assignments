@@ -18,7 +18,9 @@ __all__ = [
     'triangulate_correspondences',
     'view_mat3x4_to_pose',
     'pose_to_view_mat3x4',
-    'remove_correspondences_with_ids'
+    'remove_correspondences_with_ids',
+    'compute_reprojection_error',
+    'view_mat3x4_to_rodrigues_and_translation'
 ]
 
 from collections import namedtuple
@@ -56,6 +58,16 @@ _IDENTITY_POSE_MAT = np.hstack(
     (np.eye(3, 3, dtype=np.float32),
      np.zeros((3, 1), dtype=np.float32))
 )
+
+def compute_reprojection_error(point3d: np.ndarray, point2d: np.ndarray,
+                               proj_mat: np.ndarray) -> np.float32:
+    return compute_reprojection_errors(point3d.reshape(1, -1), point2d.reshape(1, -1), proj_mat)[0]
+
+def view_mat3x4_to_rodrigues_and_translation(view_mat: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    r_mat = view_mat[:, :3]
+    t_vec = view_mat[:, 3]
+    r_vec, _ = cv2.Rodrigues(r_mat)
+    return r_vec, t_vec
 
 
 def eye3x4() -> np.ndarray:

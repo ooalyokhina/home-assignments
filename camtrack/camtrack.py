@@ -9,7 +9,7 @@ from typing import List, Optional, Tuple
 
 import numpy as np
 import cv2
-
+from ba import run_bundle_adjustment
 from corners import *
 from data3d import CameraParameters, PointCloud, Pose
 import frameseq
@@ -61,12 +61,19 @@ def track_and_calc_colors(camera_parameters: CameraParameters,
         print(f' {new_ids_size} new points')
 
     flag = True
+    ba_step = 5
     while flag:
         flag = False
         for i in range(len(track)):
             if track[i] is None:
                 flag = tracker(i, track, points, corners, prms, intrinsic_mat)
-
+                if i > 0 and i % ba_step == 0:
+                    track[i - ba_step + 1: i + 1], points = \
+                        run_bundle_adjustment(intrinsic_mat,
+                                              corners[i - ba_step + 1: i + 1],
+                                              prms.max_reprojection_error,
+                                              track[i - ba_step + 1: i + 1],
+                                              points)
     for i in range(1, len(track)):
         if track[i] is None:
             track[i] = track[i - 1]
@@ -96,12 +103,12 @@ def get_views(corners: CornerStorage,
         pose, cloud_size = None, -1
         if len(corres.points_1) >= 5:
             retval, mask = cv2.findEssentialMat(corres.points_1, corres.points_2,
-                                                intrinsic_mat)
+                                                intrinsic_mat,
+                                                method=cv2.RANSAC, prob=0.9999, threshold=1.)
             hretval, hmask = cv2.findHomography(corres.points_1,
                                                 corres.points_2,
-                                                method=cv2.RANSAC,
                                                 ransacReprojThreshold=prms.max_reprojection_error,
-                                                confidence=0.999)
+                                                method=cv2.RANSAC, confidence=0.9999, )
             if not (retval is None) \
                     and retval.shape == (3, 3) \
                     and np.count_nonzero(mask) >= np.count_nonzero(hmask):
