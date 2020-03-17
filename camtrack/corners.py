@@ -18,8 +18,8 @@ import pims
 from _corners import FrameCorners, CornerStorage, StorageImpl
 from _corners import dump, load, draw, without_short_tracks, create_cli
 
-maxCorners = 3000
-minDistance = 7
+maxCorners = 1000
+minDistance = 6
 max_diff = 0.2
 
 
@@ -44,9 +44,9 @@ def _build_impl(frame_sequence: pims.FramesSequence,
     prev = frame_sequence[0]
     points = cv2.goodFeaturesToTrack(prev,
                                      maxCorners=maxCorners,
-                                     qualityLevel=0.05,
+                                     qualityLevel=0.01,
                                      minDistance=minDistance,
-                                     blockSize=7).squeeze(axis=1)
+                                     blockSize=5).squeeze(axis=1)
     ptr = len(points)
     ids = np.arange(ptr)
     sizes = np.full(ptr, 10)
