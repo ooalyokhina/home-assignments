@@ -18,6 +18,10 @@ import pims
 from _corners import FrameCorners, CornerStorage, StorageImpl
 from _corners import dump, load, draw, without_short_tracks, create_cli
 
+maxCorners = 3000
+minDistance = 7
+max_diff = 0.2
+
 
 class _CornerStorageBuilder:
 
@@ -36,16 +40,58 @@ class _CornerStorageBuilder:
 
 def _build_impl(frame_sequence: pims.FramesSequence,
                 builder: _CornerStorageBuilder) -> None:
-    image_0 = frame_sequence[0]
-    corners = FrameCorners(
-        np.array([0]),
-        np.array([[0, 0]]),
-        np.array([55])
-    )
-    builder.set_corners_at_frame(0, corners)
-    for frame, image_1 in enumerate(frame_sequence[1:], 1):
-        builder.set_corners_at_frame(frame, corners)
-        image_0 = image_1
+    frame_sequence = list(map(lambda t: (np.array(t) * 255.0).astype(np.uint8), frame_sequence))
+    prev = frame_sequence[0]
+    points = cv2.goodFeaturesToTrack(prev,
+                                     maxCorners=maxCorners,
+                                     qualityLevel=0.05,
+                                     minDistance=minDistance,
+                                     blockSize=7).squeeze(axis=1)
+    ptr = len(points)
+    ids = np.arange(ptr)
+    sizes = np.full(ptr, 10)
+    builder.set_corners_at_frame(0, FrameCorners(ids, points, sizes))
+    idx = 0
+    for cur in frame_sequence[1:]:
+        idx += 1
+        fwd = cv2.calcOpticalFlowPyrLK(prev, cur,
+                                       points, None,
+                                       winSize=(15, 15), maxLevel=2,
+                                       criteria=(cv2.TERM_CRITERIA_EPS
+                                                 | cv2.TERM_CRITERIA_COUNT, 10, 0.03))[0].squeeze()
+        bwd = cv2.calcOpticalFlowPyrLK(cur, prev,
+                                       fwd, None,
+                                       winSize=(15, 15), maxLevel=2,
+                                       criteria=(cv2.TERM_CRITERIA_EPS
+                                                 | cv2.TERM_CRITERIA_COUNT, 10, 0.03))[0].squeeze()
+        mask = np.abs(points - bwd).max(-1) < max_diff
+        ids = ids[mask]
+        points = fwd[mask]
+        sizes = sizes[mask]
+        pts = points
+        if len(pts) < maxCorners:
+            next_features = cv2.goodFeaturesToTrack(cur,
+                                                    mask=get_mask(pts, cur),
+                                                    maxCorners=maxCorners,
+                                                    qualityLevel=0.05,
+                                                    minDistance=minDistance,
+                                                    blockSize=7)
+            next_features = next_features.squeeze(axis=1) if next_features is not None else []
+            for pnt in next_features[:maxCorners - len(pts)]:
+                ids = np.concatenate([ids, [ptr]])
+                points = np.concatenate([points, [pnt]])
+                sizes = np.concatenate([sizes, [10]])
+                ptr += 1
+
+        builder.set_corners_at_frame(idx, FrameCorners(ids, points, sizes))
+        prev = cur
+
+
+def get_mask(points_, shape):
+    mask = np.ones_like(shape, dtype=np.uint8)
+    for x, y in points_:
+        cv2.circle(mask, (x, y), minDistance, 0, -1)
+    return mask * 255
 
 
 def build(frame_sequence: pims.FramesSequence,
